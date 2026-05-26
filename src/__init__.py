@@ -1,0 +1,3 @@
+# Package marker. Modulene under src/ importeres som
+#   from src.price_model import ...
+# fra notebooks i notebooks/, etter at miljøet er installert med `uv sync`.
