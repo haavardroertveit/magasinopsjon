@@ -109,7 +109,7 @@ Detaljer i [`notebooks/02_price_model_calibration.ipynb`](../notebooks/02_price_
 
 Bellman-ligningen for hver tilstand $(S, X)$ på dag $t$:
 
-$$V(t, S, X) = \max \left\{ Q \cdot P_t(X) + e^{-r\Delta t} \mathbb{E}[V(t{+}1, S{-}Q{+}I, X')], \;\; e^{-r\Delta t} \mathbb{E}[V(t{+}1, S{+}I, X')] \right\}$$
+$$V(t, S, X) = \max \left\lbrace Q \cdot P_t(X) + e^{-r\Delta t} \mathbb{E}[V(t{+}1, S{-}Q{+}I, X')], \;\; e^{-r\Delta t} \mathbb{E}[V(t{+}1, S{+}I, X')] \right\rbrace$$
 
 med terminal-betingelse $V(T, \cdot, \cdot) = 0$. Forventningen tas over
 $X' | X \sim N(\varphi X, \sigma_\varepsilon^2)$, diskretisert med
