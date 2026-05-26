@@ -18,8 +18,10 @@ dependencies = [
     "jupyterlab>=4.0",
     "ipykernel>=6.28",
 
-    # Datahenting (valgfritt — fallback til manuell CSV i data/raw/)
-    "requests>=2.31",
+    # Datahenting fra ENTSO-E Transparency Platform
+    "entsoe-py>=0.6",       # Python-wrapper for ENTSO-E REST API
+    "python-dotenv>=1.0",   # Last API-token fra .env (utenfor git)
+    "requests>=2.31",       # underliggende HTTP (entsoe-py bruker den også)
 ]
 
 # Hatchling bygger pakken slik at `from src.price_model import ...`

@@ -23,3 +23,7 @@ venv/
 # Rådata holdes ute av git (kan være store, kan ha lisensbetingelser)
 data/raw/*
 !data/raw/.gitkeep
+
+# Hemmeligheter (API-tokens etc.) — .env.example committes som mal
+.env
+.env.local
