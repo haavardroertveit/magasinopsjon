@@ -49,9 +49,17 @@ PROCESSED_DIR: Path = PROJECT_ROOT / "data" / "processed"
 # File names for the cached parquet datasets
 HOURLY_PARQUET: Path = PROCESSED_DIR / "no2_prices_hourly.parquet"
 DAILY_PARQUET: Path = PROCESSED_DIR / "no2_prices_daily.parquet"
+NVE_RESERVOIR_PARQUET: Path = PROCESSED_DIR / "nve_reservoir_no2.parquet"
 
 # ENTSO-E area code for the NO2 bidding zone. `entsoe-py` uses underscore form.
 NO2_AREA_CODE: str = "NO_2"
+
+# NVE elspot-area number for NO2 (1=NO1, 2=NO2, ... 5=NO5).
+NVE_NO2_OMRNR: int = 2
+
+# Public NVE magasinstatistikk endpoint — no auth required, weekly resolution
+# per elspot area going back to 1995.
+NVE_API_URL: str = "https://biapi.nve.no/magasinstatistikk/api/Magasinstatistikk/HentOffentligData"
 
 # Norwegian local time. ENTSO-E will return data indexed in this timezone when
 # we pass tz-aware Timestamps in this zone to the query.
@@ -281,8 +289,97 @@ def refresh_cache(start_year: int = 2020, end_year: Optional[int] = None) -> Non
 
 
 # -----------------------------------------------------------------------------
-# Script entry point — `uv run python -m src.data_loader` does a full refresh.
+# NVE magasinstatistikk (reservoir filling per elspot area)
+# -----------------------------------------------------------------------------
+#
+# Used as *context* only — not as input to the option model in v1. The
+# correlation between reservoir filling and spot price is one of the most
+# basic stylized facts of the Norwegian power market, so we plot them
+# alongside in notebook 01 to motivate the v2 extension that would model
+# inflow as stochastic.
+
+def fetch_nve_reservoir(
+    area_no: int = NVE_NO2_OMRNR,
+    start_year: int = 2018,
+) -> pd.DataFrame:
+    """
+    Fetch weekly reservoir filling for one Norwegian elspot area from NVE.
+
+    Hits the public NVE Magasinstatistikk API (no auth). The endpoint returns
+    a single JSON payload with all areas; we filter to ``omrType == 'EL'``
+    (= elspot areas) and the requested area number.
+
+    Parameters
+    ----------
+    area_no : int, default 2
+        NVE elspot area number. 1 = NO1, 2 = NO2, ..., 5 = NO5.
+    start_year : int, default 2018
+        Filter to records on or after January 1 of this year. NVE has data
+        back to 1995, but for the project context (NO2 prices 2020-now) we
+        want roughly the same window.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: date (datetime), iso_year, iso_week, fyllingsgrad (0-1),
+        kapasitet_twh, fylling_twh, endring_fyllingsgrad (week-over-week
+        change in filling ratio). Sorted by date, indexed by integer.
+    """
+    import requests
+    response = requests.get(NVE_API_URL, timeout=30)
+    response.raise_for_status()
+    records = response.json()
+
+    df = pd.DataFrame(records)
+    # Keep only elspot areas (omrType='EL') for the requested area number.
+    df = df[(df["omrType"] == "EL") & (df["omrnr"] == area_no)].copy()
+    df["date"] = pd.to_datetime(df["dato_Id"])
+    df = df[df["date"] >= pd.Timestamp(start_year, 1, 1)].copy()
+    df = df.sort_values("date").reset_index(drop=True)
+
+    # Trim and rename to a tidy schema. The original camel/snake mix is a bit
+    # ugly; we standardise on snake_case English-flavoured field names.
+    out = pd.DataFrame({
+        "date": df["date"],
+        "iso_year": df["iso_aar"].astype(int),
+        "iso_week": df["iso_uke"].astype(int),
+        "fyllingsgrad": df["fyllingsgrad"].astype(float),
+        "kapasitet_twh": df["kapasitet_TWh"].astype(float),
+        "fylling_twh": df["fylling_TWh"].astype(float),
+        "endring_fyllingsgrad": df["endring_fyllingsgrad"].astype(float),
+    })
+    return out
+
+
+def cache_nve_reservoir(df: pd.DataFrame) -> None:
+    """Write the NVE reservoir DataFrame to parquet under data/processed/."""
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(NVE_RESERVOIR_PARQUET)
+    print(f"Wrote {NVE_RESERVOIR_PARQUET.relative_to(PROJECT_ROOT)} ({len(df):,} rows)")
+
+
+def load_cached_nve_reservoir() -> pd.DataFrame:
+    """Read the NVE reservoir parquet. Raises FileNotFoundError if not cached."""
+    if not NVE_RESERVOIR_PARQUET.exists():
+        raise FileNotFoundError(
+            f"No cached NVE data at {NVE_RESERVOIR_PARQUET}. "
+            "Run `refresh_nve_cache()` or `uv run python -m src.data_loader` first."
+        )
+    return pd.read_parquet(NVE_RESERVOIR_PARQUET)
+
+
+def refresh_nve_cache(area_no: int = NVE_NO2_OMRNR, start_year: int = 2018) -> None:
+    """Fetch + cache NVE reservoir data for one area."""
+    print(f"Fetching NVE reservoir filling for area {area_no} (from {start_year})...")
+    df = fetch_nve_reservoir(area_no=area_no, start_year=start_year)
+    cache_nve_reservoir(df)
+
+
+# -----------------------------------------------------------------------------
+# Script entry point — `uv run python -m src.data_loader` does a full refresh
+# of both ENTSO-E prices and NVE reservoir data.
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
     refresh_cache()
+    refresh_nve_cache()
