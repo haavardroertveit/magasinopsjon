@@ -5,8 +5,7 @@ stokastisk prismodell og dynamisk programmering. Prosjektet behandler magasinet
 som en amerikansk realopsjon: retten — men ikke plikten — til å produsere kraft
 når spotprisen er høy nok til å forsvare alternativkostnaden av vann.
 
-> Status: under utvikling. Tallresultater og figurer legges inn etterhvert som
-> de tre notebookene fylles ut.
+> **Fullført v1.** Tre notebooks + skriftlig rapport. Se [`report/summary.md`](report/summary.md) for en 3-siders oppsummering med metode, resultater og diskusjon av begrensninger.
 
 ## Hva prosjektet viser
 
